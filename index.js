@@ -21,7 +21,7 @@ const pool = new Pool({
 // =======================
 const MPESA_BASE_URL = "https://sandbox.safaricom.co.ke";
 const SHORTCODE = "174379";
-const PASSKEY = "bfb279f9aa9bdbcf158e97dd71a467cd";
+const PASSKEY = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919";
 
 // =======================
 // UTILITY FUNCTIONS
