@@ -172,4 +172,105 @@ app.listen(PORT, () => {
   console.log(`Backend running on port ${PORT}`);
   initDb();
 });
+import axios from "axios";
+
+async function getAccessToken() {
+  const auth = Buffer.from(
+    `${process.env.MPESA_CONSUMER_KEY}:${process.env.MPESA_CONSUMER_SECRET}`
+  ).toString("base64");
+
+  const response = await axios.get(
+    "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials",
+    {
+      headers: { Authorization: `Basic ${auth}` }
+    }
+  );
+
+  return response.data.access_token;
+}
+app.post("/stkpush", async (req, res) => {
+  try {
+    const { phone, amount } = req.body;
+
+    const token = await getAccessToken();
+    const timestamp = new Date()
+      .toISOString()
+      .replace(/[^0-9]/g, "")
+      .slice(0, 14);
+
+    const password = Buffer.from(
+      process.env.MPESA_SHORTCODE +
+      process.env.MPESA_PASSKEY +
+      timestamp
+    ).toString("base64");
+
+    const response = await axios.post(
+      "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest",
+      {
+        BusinessShortCode: process.env.MPESA_SHORTCODE,
+        Password: password,
+        Timestamp: timestamp,
+        TransactionType: "CustomerPayBillOnline",
+        Amount: amount,
+        PartyA: phone,
+        PartyB: process.env.MPESA_SHORTCODE,
+        PhoneNumber: phone,
+        CallBackURL: `${process.env.BASE_URL}/callback`,
+        AccountReference: "ESP8266",
+        TransactionDesc: "ESP8266 Payment"
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    );
+
+    const transactionId = response.data.CheckoutRequestID;
+
+    await pool.query(
+      "INSERT INTO transactions(transaction_id, phone, amount, status) VALUES($1,$2,$3,'PENDING')",
+      [transactionId, phone, amount]
+    );
+
+    res.json({ transactionId });
+
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ error: "STK Push failed" });
+  }
+});
+app.post("/callback", async (req, res) => {
+  const data = req.body.Body.stkCallback;
+  const id = data.CheckoutRequestID;
+
+  if (data.ResultCode === 0) {
+    const receipt = data.CallbackMetadata.Item.find(i => i.Name === "MpesaReceiptNumber").Value;
+
+    await pool.query(
+      "UPDATE transactions SET status='SUCCESS', mpesa_receipt=$1 WHERE transaction_id=$2",
+      [receipt, id]
+    );
+  } else {
+    await pool.query(
+      "UPDATE transactions SET status='FAILED' WHERE transaction_id=$1",
+      [id]
+    );
+  }
+
+  res.json({ ok: true });
+});
+app.get("/status/:id", async (req, res) => {
+  const result = await pool.query(
+    "SELECT status FROM transactions WHERE transaction_id=$1",
+    [req.params.id]
+  );
+
+  if (result.rows.length === 0) {
+    return res.json({ status: "UNKNOWN" });
+  }
+
+  res.json({ status: result.rows[0].status });
+});
+
 
