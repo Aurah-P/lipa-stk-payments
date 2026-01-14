@@ -56,20 +56,22 @@ async function getAccessToken() {
   return response.data.access_token;
 }
 
-// =======================
-// INIT DATABASE TABLE
-// =======================
-(async () => {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS transactions (
-      transaction_id TEXT PRIMARY KEY,
-      phone TEXT,
-      amount INTEGER,
-      status TEXT,
-      mpesa_receipt TEXT
-    );
-  `);
-})();
+async function initDb() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS transactions (
+        transaction_id TEXT PRIMARY KEY,
+        phone TEXT,
+        amount INTEGER,
+        status TEXT,
+        mpesa_receipt TEXT
+      );
+    `);
+    console.log("Database initialized");
+  } catch (err) {
+    console.error("Database init failed:", err.message);
+  }
+}
 
 // =======================
 // 1. STK PUSH ENDPOINT
@@ -168,4 +170,6 @@ app.get("/status", async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Backend running on port ${PORT}`);
+  initDb();
 });
+
