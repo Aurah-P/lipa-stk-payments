@@ -20,8 +20,9 @@ const pool = new Pool({
 // MPESA SANDBOX CONSTANTS
 // =======================
 const MPESA_BASE_URL = "https://sandbox.safaricom.co.ke";
-const SHORTCODE = "174379";
-const PASSKEY = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919";
+const SHORTCODE = process.env.MPESA_SHORTCODE;
+const PASSKEY = process.env.MPESA_PASSKEY;
+
 
 // =======================
 // UTILITY FUNCTIONS
@@ -149,8 +150,8 @@ app.post("/callback", async (req, res) => {
 // =======================
 // 3. STATUS POLLING
 // =======================
-app.get("/status", async (req, res) => {
-  const { transactionId } = req.query;
+app.get("/status/:transactionId", async (req, res) => {
+  const transactionId = req.params.transactionId;
 
   const result = await pool.query(
     "SELECT status FROM transactions WHERE transaction_id=$1",
@@ -163,6 +164,7 @@ app.get("/status", async (req, res) => {
 
   res.json({ status: result.rows[0].status });
 });
+
 
 // =======================
 // SERVER START
